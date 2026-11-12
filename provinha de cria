@@ -1,1 +1,235 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controle de Estoque Simples</title>
+    <style>
+        /* Estilos CSS para o visual da aplicação */
+        * {
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            background-color: #f4f7f6;
+            color: #333;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        p.subtitle {
+            text-align: center;
+            color: #7f8c8d;
+            margin-bottom: 25px;
+            font-size: 0.95rem;
+        }
+        .form-group {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr auto;
+            gap: 10px;
+            margin-bottom: 25px;
+        }
+        input {
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 1rem;
+        }
+        button {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+        .btn-add {
+            background-color: #27ae60;
+            color: white;
+        }
+        .btn-add:hover {
+            background-color: #219150;
+        }
+        .search-bar {
+            width: 100%;
+            margin-bottom: 15px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #2c3e50;
+            color: white;
+        }
+        .btn-qty {
+            background-color: #3498db;
+            color: white;
+            padding: 5px 10px;
+            margin: 0 2px;
+        }
+        .btn-del {
+            background-color: #e74c3c;
+            color: white;
+            padding: 5px 10px;
+        }
+        .empty-msg {
+            text-align: center;
+            padding: 20px;
+            color: #7f8c8d;
+        }
+        @media (max-width: 600px) {
+            .form-group {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
 
+<div class="container">
+    <h1>📦 Gerenciador de Estoque</h1>
+    <p class="subtitle">Finalidade: Facilitar o cadastro, consulta e controle de quantidade de produtos.</p>
+
+    <!-- Formulário de Cadastro -->
+    <form id="product-form" class="form-group">
+        <input type="text" id="name" placeholder="Nome do Produto (ex: Teclado)" required>
+        <input type="number" id="quantity" placeholder="Quantidade" min="1" required>
+        <input type="number" id="price" placeholder="Preço (R$)" step="0.01" min="0" required>
+        <button type="submit" class="btn-add">+ Cadastrar</button>
+    </form>
+
+    <!-- Barra de Consulta -->
+    <input type="text" id="search" class="search-bar" placeholder="🔍 Consultar produto pelo nome...">
+
+    <!-- Tabela de Exibição -->
+    <table>
+        <thead>
+            <tr>
+                <th>Produto</th>
+                <th>Quantidade</th>
+                <th>Preço Unit.</th>
+                <th>Total</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody id="product-list">
+            <!-- Os itens salvos no banco aparecerão aqui -->
+        </tbody>
+    </table>
+    <div id="empty-message" class="empty-msg">Nenhum produto cadastrado no momento.</div>
+</div>
+
+<script>
+    // Banco de dados local usando LocalStorage
+    let products = JSON.parse(localStorage.getItem('estoque_db')) || [];
+
+    const form = document.getElementById('product-form');
+    const productList = document.getElementById('product-list');
+    const searchInput = document.getElementById('search');
+    const emptyMessage = document.getElementById('empty-message');
+
+    // Salva os dados no banco local
+    function saveDatabase() {
+        localStorage.setItem('estoque_db', JSON.stringify(products));
+    }
+
+    // Renderiza a tabela na tela
+    function renderTable(filter = '') {
+        productList.innerHTML = '';
+        const filteredProducts = products.filter(p => 
+            p.name.toLowerCase().includes(filter.toLowerCase())
+        );
+
+        if (filteredProducts.length === 0) {
+            emptyMessage.style.display = 'block';
+        } else {
+            emptyMessage.style.display = 'none';
+            filteredProducts.forEach((product) => {
+                // Encontra o índice real no array original
+                const realIndex = products.findIndex(p => p.id === product.id);
+                const total = (product.quantity * product.price).toFixed(2);
+
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><strong>${product.name}</strong></td>
+                    <td>${product.quantity} un.</td>
+                    <td>R$ ${parseFloat(product.price).toFixed(2)}</td>
+                    <td>R$ ${total}</td>
+                    <td>
+                        <button class="btn-qty" onclick="changeQty(${realIndex}, 1)">+</button>
+                        <button class="btn-qty" onclick="changeQty(${realIndex}, -1)">-</button>
+                        <button class="btn-del" onclick="deleteProduct(${realIndex})">Excluir</button>
+                    </td>
+                `;
+                productList.appendChild(row);
+            });
+        }
+    }
+ // Adiciona um novo produto
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const name = document.getElementById('name').value;
+        const quantity = parseInt(document.getElementById('quantity').value);
+        const price = parseFloat(document.getElementById('price').value);
+
+        const newProduct = {
+            id: Date.now(),
+            name: name,
+            quantity: quantity,
+            price: price
+        };
+
+        products.push(newProduct);
+        saveDatabase();
+        renderTable(searchInput.value);
+        form.reset();
+    });
+
+    // Altera a quantidade (+ ou -)
+    function changeQty(index, amount) {
+        products[index].quantity += amount;
+        if (products[index].quantity <= 0) {
+            deleteProduct(index);
+        } else {
+            saveDatabase();
+            renderTable(searchInput.value);
+        }
+    }
+
+    // Remove um produto
+    function deleteProduct(index) {
+        products.splice(index, 1);
+        saveDatabase();
+        renderTable(searchInput.value);
+    }
+
+    // Filtra a consulta em tempo real
+    searchInput.addEventListener('input', function() {
+        renderTable(this.value);
+    });
+
+    // Inicializa a tabela ao abrir a página
+    renderTable();
+</script>
+
+</body>
+</html>
